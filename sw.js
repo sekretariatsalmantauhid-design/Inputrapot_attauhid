@@ -1,5 +1,5 @@
 // UBAH ANGKA INI SETIAP KALI UPDATE asatidzah.html (Misal: v2, v3, v4)
-const CACHE_NAME = 'erapot-guru-v1.1'; 
+const CACHE_NAME = 'erapot-guru-v1.2'; 
 
 const urlsToCache = [
   './',

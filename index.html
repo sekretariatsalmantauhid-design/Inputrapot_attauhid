@@ -33,7 +33,7 @@
             <div class="text-left mb-5">
                 <label class="block text-xs font-bold text-gray-600 mb-2 ml-1 uppercase tracking-wide">Pilih Semester</label>
                 <div class="relative">
-                    <select id="loginSelectSemester" class="w-full bg-indigo-50 border-2 border-indigo-200 text-indigo-900 text-sm font-bold rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block p-3.5 shadow-sm appearance-none">
+                    <select id="loginSelectSemester" onchange="loadMasterData()" class="w-full bg-indigo-50 border-2 border-indigo-200 text-indigo-900 text-sm font-bold rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block p-3.5 shadow-sm appearance-none">
                         <option value="2024_Ganjil">2024/2025 - Ganjil</option>
                         <option value="2024_Genap">2024/2025 - Genap</option>
                         <option value="2025_Ganjil" selected>2025/2026 - Ganjil</option>
@@ -138,14 +138,33 @@
         let activeTugas = null; 
         let activeSemesterGuru = "2025_Ganjil"; // Default
 
-        // Sync Master Data
-        onValue(ref(db, 'Master/Guru'), (snap) => { 
-            dataGuruAll = snap.val() || {}; 
-            renderDropdownLogin(); 
-            if(loggedInGuruId && dataGuruAll[loggedInGuruId]) renderTugasDashboard(); 
-        });
-        onValue(ref(db, 'Master/Kelas'), (snap) => { dataKelasAll = snap.val() || {}; });
-        onValue(ref(db, 'Master/Mapel'), (snap) => { dataMapelAll = snap.val() || {}; });
+        let unsubGuru, unsubKelas, unsubMapel, unsubNilai; // Tambahkan unsubNilai
+
+        // Fungsi baru agar data Master & Nilai sinkron sesuai semester yang dipilih
+        window.loadMasterData = function() {
+            activeSemesterGuru = document.getElementById('loginSelectSemester').value;
+            
+            document.getElementById('loginSelectGuru').innerHTML = '<option value="">Memuat data server...</option>';
+
+            // Putus koneksi lama jika Ustadz ganti pilihan semester
+            if(unsubGuru) unsubGuru(); if(unsubKelas) unsubKelas(); if(unsubMapel) unsubMapel(); if(unsubNilai) unsubNilai();
+
+            // AMBIL DATA DARI KAMAR SEMESTER (SINKRON DENGAN MASTER RAPOT)
+            unsubGuru = onValue(ref(db, `TahunAjaran/${activeSemesterGuru}/Master/Guru`), (snap) => { 
+                dataGuruAll = snap.val() || {}; 
+                renderDropdownLogin(); 
+                if(loggedInGuruId && dataGuruAll[loggedInGuruId]) renderTugasDashboard(); 
+            });
+            unsubKelas = onValue(ref(db, `TahunAjaran/${activeSemesterGuru}/Master/Kelas`), (snap) => { dataKelasAll = snap.val() || {}; });
+            unsubMapel = onValue(ref(db, `TahunAjaran/${activeSemesterGuru}/Master/Mapel`), (snap) => { dataMapelAll = snap.val() || {}; });
+            
+            // SINKRONKAN DATA NILAI AGAR PROGRES BAR JALAN (REAL-TIME)
+            unsubNilai = onValue(ref(db, `TahunAjaran/${activeSemesterGuru}/Nilai`), (snap) => {
+                dataNilaiAll = snap.val() || {};
+                // Jika guru sedang login, render ulang dashboard agar progres bar otomatis nambah
+                if(loggedInGuruId && dataGuruAll[loggedInGuruId]) renderTugasDashboard(); 
+            });
+        };
 
         const viewLogin = document.getElementById('viewLogin');
         const viewDashboard = document.getElementById('viewDashboard');
