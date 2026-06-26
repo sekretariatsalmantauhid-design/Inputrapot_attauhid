@@ -196,23 +196,16 @@
             viewElement.classList.add('fade-in');
         }
 
-        window.getBadgeInfo = function(nilaiStr) {
+                window.getBadgeInfo = function(nilaiStr) {
             if(nilaiStr === "") return { class: 'bg-gray-100 text-gray-400 border-gray-200', text: '- (-)' };
             const n = parseFloat(nilaiStr);
             if(n > 100 || n < 0) return { class: 'bg-red-100 text-red-700 border-red-300', text: 'Error' };
-            if(n >= 95) return { class: 'bg-emerald-100 text-emerald-800 border-emerald-400', text: 'A+ (4.00)' };
-            if(n >= 90) return { class: 'bg-green-100 text-green-700 border-green-400', text: 'A (3.75)' };
-            if(n >= 85) return { class: 'bg-green-50 text-green-600 border-green-300', text: 'A- (3.50)' };
-            if(n >= 80) return { class: 'bg-blue-100 text-blue-800 border-blue-400', text: 'B+ (3.25)' };
-            if(n >= 75) return { class: 'bg-blue-50 text-blue-700 border-blue-300', text: 'B (3.00)' };
-            if(n >= 70) return { class: 'bg-sky-50 text-sky-600 border-sky-300', text: 'B- (2.75)' };
-            if(n >= 65) return { class: 'bg-yellow-100 text-yellow-800 border-yellow-400', text: 'C+ (2.50)' };
-            if(n >= 60) return { class: 'bg-amber-50 text-amber-700 border-amber-300', text: 'C (2.25)' };
-            if(n >= 55) return { class: 'bg-orange-50 text-orange-600 border-orange-300', text: 'C- (2.00)' };
-            if(n >= 50) return { class: 'bg-orange-100 text-orange-800 border-orange-400', text: 'D+ (1.50)' };
-            if(n >= 45) return { class: 'bg-red-50 text-red-600 border-red-300', text: 'D (1.00)' };
-            if(n >= 40) return { class: 'bg-red-50 text-red-500 border-red-200', text: 'D- (0.50)' };
-            return { class: 'bg-red-100 text-red-800 border-red-500', text: 'E (0.00)' };
+            
+            if(n >= 90) return { class: 'bg-emerald-100 text-emerald-800 border-emerald-400', text: 'Istimewa (ممتاز)' };
+            if(n >= 80) return { class: 'bg-blue-100 text-blue-800 border-blue-400', text: 'Bagus Sekali (جيد جدا)' };
+            if(n >= 70) return { class: 'bg-green-100 text-green-700 border-green-300', text: 'Bagus (جيد)' };
+            if(n >= 60) return { class: 'bg-yellow-100 text-yellow-800 border-yellow-400', text: 'Cukup (مقبول)' };
+            return { class: 'bg-red-100 text-red-800 border-red-500', text: 'Kurang (ناقص)' };
         };
 
         function renderDropdownLogin() {
