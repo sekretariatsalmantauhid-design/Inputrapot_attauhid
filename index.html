@@ -82,8 +82,7 @@
 
         <main class="flex-1 p-6">
             <h3 class="text-indigo-100 font-bold mb-5 flex items-center text-lg tracking-wide"><i class="fas fa-layer-group mr-3 text-indigo-400 text-xl"></i> Tugas Mengajar</h3>
-            <div id="listTugas" class="space-y-5">
-                </div>
+            <div id="listTugas" class="space-y-5"></div>
         </main>
     </div>
 
@@ -100,14 +99,36 @@
             </div>
         </header>
 
-        <main class="flex-1 p-6 pb-32">
-            <div id="listSiswaInput" class="space-y-4">
+        <main class="flex-1 p-4 pb-32 max-w-lg mx-auto w-full">
+            
+            <!-- PANEL ATUR RUMUS PENILAIAN -->
+            <div class="mb-5">
+                <button onclick="togglePanelRumus()" class="w-full bg-white border border-indigo-100 text-indigo-700 font-bold py-3 px-5 rounded-2xl shadow-sm flex justify-between items-center transition-all hover:bg-indigo-50">
+                    <span class="flex items-center"><i class="fas fa-calculator mr-3 text-lg"></i> Atur Rumus Penilaian</span>
+                    <i class="fas fa-chevron-down text-sm transition-transform" id="iconRumus"></i>
+                </button>
+                <div id="panelRumus" class="hidden bg-white mt-2 p-5 rounded-2xl shadow-lg border border-indigo-100 fade-in">
+                    <div class="bg-indigo-50 text-indigo-800 text-[11px] p-3 rounded-xl mb-4 font-semibold border border-indigo-100">
+                        <i class="fas fa-info-circle mr-1"></i> Tambahkan komponen nilai. Pastikan total bobot mencapai tepat <b class="font-black text-red-500">100%</b>.
+                    </div>
+                    <div id="listRumus" class="space-y-3 mb-4"></div>
+                    <button onclick="tambahRumus()" class="w-full py-2.5 rounded-xl border-2 border-dashed border-indigo-300 text-indigo-600 font-bold text-sm hover:bg-indigo-50 transition"><i class="fas fa-plus mr-1"></i> Tambah Komponen Ujian</button>
+                    
+                    <div class="mt-5 border-t border-gray-100 pt-4 flex justify-between items-center">
+                        <div class="text-sm font-extrabold text-gray-700">Total: <span id="totRumus" class="text-red-500 text-lg">0</span>%</div>
+                        <button onclick="simpanRumus()" class="bg-indigo-600 text-white text-sm font-bold px-6 py-2.5 rounded-xl shadow-[0_4px_12px_rgba(79,70,229,0.3)] active:scale-95 transition">Terapkan</button>
+                    </div>
                 </div>
+            </div>
+
+            <!-- DAFTAR SISWA & INPUT GRID -->
+            <div id="listSiswaInput" class="space-y-4"></div>
+
         </main>
 
         <div class="fixed bottom-0 left-0 right-0 p-5 bg-white/90 backdrop-blur-md border-t border-gray-200 shadow-[0_-10px_30px_rgba(0,0,0,0.1)] z-20">
-            <button id="btnSimpanNilai" onclick="simpanKeServer()" class="w-full text-white bg-indigo-600 hover:bg-indigo-700 font-extrabold rounded-2xl text-lg px-5 py-4 shadow-[0_8px_20px_rgba(79,70,229,0.4)] active:scale-[0.98] transition-all flex justify-center items-center tracking-wide">
-                <i class="fas fa-cloud-upload-alt mr-3 text-2xl"></i> Simpan Nilai
+            <button id="btnSimpanNilai" onclick="simpanKeServer()" class="w-full max-w-lg mx-auto text-white bg-indigo-600 hover:bg-indigo-700 font-extrabold rounded-2xl text-lg px-5 py-4 shadow-[0_8px_20px_rgba(79,70,229,0.4)] active:scale-[0.98] transition-all flex justify-center items-center tracking-wide block">
+                <i class="fas fa-cloud-upload-alt mr-3 text-2xl"></i> Simpan Rapot
             </button>
         </div>
     </div>
@@ -116,6 +137,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
         import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
 
+        // GANTI DENGAN FIREBASE USTADZ
         const firebaseConfig = {
             apiKey: "AIzaSyDe005OXrgGH2oojwwUGnsmzEr0RxzmnMI",
             authDomain: "rapotmaster-attauhid.firebaseapp.com",
@@ -129,27 +151,24 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        let dataGuruAll = {};
-        let dataKelasAll = {};
-        let dataMapelAll = {};
-        let dataNilaiAll = {};
+        let dataGuruAll = {}; let dataKelasAll = {}; let dataMapelAll = {}; let dataNilaiAll = {};
         
         let loggedInGuruId = null;
         let activeTugas = null; 
-        let activeSemesterGuru = "2025_Ganjil"; // Default
+        let activeSemesterGuru = "2025_Ganjil"; 
 
-        let unsubGuru, unsubKelas, unsubMapel, unsubNilai; // Tambahkan unsubNilai
+        let unsubGuru, unsubKelas, unsubMapel, unsubNilai; 
+        
+        // VARIABEL RUMUS
+        let activeKomponen = [];
+        let tempKomponen = [];
 
-        // Fungsi baru agar data Master & Nilai sinkron sesuai semester yang dipilih
         window.loadMasterData = function() {
             activeSemesterGuru = document.getElementById('loginSelectSemester').value;
-            
             document.getElementById('loginSelectGuru').innerHTML = '<option value="">Memuat data server...</option>';
 
-            // Putus koneksi lama jika Ustadz ganti pilihan semester
             if(unsubGuru) unsubGuru(); if(unsubKelas) unsubKelas(); if(unsubMapel) unsubMapel(); if(unsubNilai) unsubNilai();
 
-            // AMBIL DATA DARI KAMAR SEMESTER (SINKRON DENGAN MASTER RAPOT)
             unsubGuru = onValue(ref(db, `TahunAjaran/${activeSemesterGuru}/Master/Guru`), (snap) => { 
                 dataGuruAll = snap.val() || {}; 
                 renderDropdownLogin(); 
@@ -158,10 +177,8 @@
             unsubKelas = onValue(ref(db, `TahunAjaran/${activeSemesterGuru}/Master/Kelas`), (snap) => { dataKelasAll = snap.val() || {}; });
             unsubMapel = onValue(ref(db, `TahunAjaran/${activeSemesterGuru}/Master/Mapel`), (snap) => { dataMapelAll = snap.val() || {}; });
             
-            // SINKRONKAN DATA NILAI AGAR PROGRES BAR JALAN (REAL-TIME)
             unsubNilai = onValue(ref(db, `TahunAjaran/${activeSemesterGuru}/Nilai`), (snap) => {
                 dataNilaiAll = snap.val() || {};
-                // Jika guru sedang login, render ulang dashboard agar progres bar otomatis nambah
                 if(loggedInGuruId && dataGuruAll[loggedInGuruId]) renderTugasDashboard(); 
             });
         };
@@ -172,45 +189,32 @@
 
         function switchView(viewElement) {
             [viewLogin, viewDashboard, viewInput].forEach(v => {
-                v.classList.add('hidden');
-                v.classList.remove('fade-in');
+                v.classList.add('hidden'); v.classList.remove('fade-in');
             });
             viewElement.classList.remove('hidden');
             void viewElement.offsetWidth;
             viewElement.classList.add('fade-in');
         }
 
-        // PENAMBAHAN SKALA NILAI LEBIH DETAIL (SESUAI REQUEST)
         window.getBadgeInfo = function(nilaiStr) {
-            if(nilaiStr === "") return { class: 'bg-gray-100 text-gray-500 border-gray-200', text: '- (-)' };
+            if(nilaiStr === "") return { class: 'bg-gray-100 text-gray-400 border-gray-200', text: '- (-)' };
             const n = parseFloat(nilaiStr);
             if(n > 100 || n < 0) return { class: 'bg-red-100 text-red-700 border-red-300', text: 'Error' };
-            
-            // Cluster A (Hijau Terang/Emerald)
             if(n >= 95) return { class: 'bg-emerald-100 text-emerald-800 border-emerald-400', text: 'A+ (4.00)' };
             if(n >= 90) return { class: 'bg-green-100 text-green-700 border-green-400', text: 'A (3.75)' };
             if(n >= 85) return { class: 'bg-green-50 text-green-600 border-green-300', text: 'A- (3.50)' };
-            
-            // Cluster B (Biru)
             if(n >= 80) return { class: 'bg-blue-100 text-blue-800 border-blue-400', text: 'B+ (3.25)' };
             if(n >= 75) return { class: 'bg-blue-50 text-blue-700 border-blue-300', text: 'B (3.00)' };
             if(n >= 70) return { class: 'bg-sky-50 text-sky-600 border-sky-300', text: 'B- (2.75)' };
-            
-            // Cluster C (Kuning/Amber)
             if(n >= 65) return { class: 'bg-yellow-100 text-yellow-800 border-yellow-400', text: 'C+ (2.50)' };
             if(n >= 60) return { class: 'bg-amber-50 text-amber-700 border-amber-300', text: 'C (2.25)' };
             if(n >= 55) return { class: 'bg-orange-50 text-orange-600 border-orange-300', text: 'C- (2.00)' };
-            
-            // Cluster D (Merah Bata/Orange Tua)
             if(n >= 50) return { class: 'bg-orange-100 text-orange-800 border-orange-400', text: 'D+ (1.50)' };
             if(n >= 45) return { class: 'bg-red-50 text-red-600 border-red-300', text: 'D (1.00)' };
             if(n >= 40) return { class: 'bg-red-50 text-red-500 border-red-200', text: 'D- (0.50)' };
-            
-            // Cluster E (Merah Gelap)
             return { class: 'bg-red-100 text-red-800 border-red-500', text: 'E (0.00)' };
         };
 
-        // --- LOGIN LOGIC ---
         function renderDropdownLogin() {
             const select = document.getElementById('loginSelectGuru');
             if(loggedInGuruId) return; 
@@ -220,10 +224,9 @@
         window.prosesLogin = function() {
             const id = document.getElementById('loginSelectGuru').value;
             const pin = document.getElementById('loginPin').value;
-            activeSemesterGuru = document.getElementById('loginSelectSemester').value; // SET SEMESTER AKTIF
+            activeSemesterGuru = document.getElementById('loginSelectSemester').value;
 
-            if(!id) return alert('Silakan pilih identitas Anda!');
-            if(!pin) return alert('Masukkan PIN rahasia!');
+            if(!id || !pin) return alert('Silakan pilih identitas dan masukkan PIN!');
             
             if(dataGuruAll[id].pin === pin) {
                 loggedInGuruId = id;
@@ -231,16 +234,12 @@
                 document.getElementById('dashNamaGuru').innerText = dataGuruAll[id].nama;
                 document.getElementById('dashSemesterText').innerText = activeSemesterGuru.replace('_', ' ');
                 
-                // Mulai listen nilai KHUSUS UNTUK SEMESTER INI
                 onValue(ref(db, `TahunAjaran/${activeSemesterGuru}/Nilai`), (snap) => { 
                     dataNilaiAll = snap.val() || {}; 
-                    if(activeTugas === null) renderTugasDashboard(); // re-render dashboard progres
+                    if(activeTugas === null) renderTugasDashboard(); 
                 });
-
                 switchView(viewDashboard);
-            } else {
-                alert('PIN Salah. Akses Ditolak.');
-            }
+            } else { alert('PIN Salah. Akses Ditolak.'); }
         };
 
         window.logout = function() {
@@ -250,7 +249,6 @@
             switchView(viewLogin);
         };
 
-        // --- DASHBOARD LOGIC ---
         function renderTugasDashboard() {
             const tugas = dataGuruAll[loggedInGuruId].tugasMengajar || [];
             const container = document.getElementById('listTugas');
@@ -264,8 +262,6 @@
             tugas.forEach(t => {
                 const kNama = dataKelasAll[t.idKelas]?.nama || 'Kelas Dihapus';
                 const mNama = dataMapelAll[t.idMapel]?.nama || 'Mapel Dihapus';
-                
-                // Hitung jumlah santri yang AKTIF
                 let sTotal = 0;
                 Object.values(dataKelasAll[t.idKelas]?.siswa || {}).forEach(s => {
                     if(s.status !== 'nonaktif' || (s.nonaktifSemester && s.nonaktifSemester !== activeSemesterGuru)) sTotal++;
@@ -301,7 +297,93 @@
             container.innerHTML = html;
         }
 
-        // --- FORM INPUT LOGIC ---
+        // --- SISTEM RUMUS KOMPONEN NILAI ---
+        window.togglePanelRumus = function() {
+            const p = document.getElementById('panelRumus');
+            const icon = document.getElementById('iconRumus');
+            p.classList.toggle('hidden');
+            if(!p.classList.contains('hidden')) {
+                icon.classList.add('rotate-180');
+                tempKomponen = JSON.parse(JSON.stringify(activeKomponen));
+                renderListRumus();
+            } else {
+                icon.classList.remove('rotate-180');
+            }
+        };
+
+        window.renderListRumus = function() {
+            let html = ''; let tot = 0;
+            tempKomponen.forEach((k, i) => {
+                tot += parseFloat(k.bobot) || 0;
+                html += `
+                <div class="flex gap-2 items-center bg-gray-50 p-2 rounded-xl border border-gray-200">
+                    <select id="r_nama_${i}" onchange="updateTempRumus()" class="flex-1 bg-transparent text-sm text-indigo-900 font-bold focus:outline-none focus:ring-0 appearance-none">
+                        <option value="Ujian Harian" ${k.nama=='Ujian Harian'?'selected':''}>Ujian Harian</option>
+                        <option value="Nilai UTS" ${k.nama=='Nilai UTS'?'selected':''}>Nilai UTS</option>
+                        <option value="Nilai UAS" ${k.nama=='Nilai UAS'?'selected':''}>Nilai UAS</option>
+                        <option value="Tugas 1" ${k.nama=='Tugas 1'?'selected':''}>Tugas 1</option>
+                        <option value="Tugas 2" ${k.nama=='Tugas 2'?'selected':''}>Tugas 2</option>
+                        <option value="Tugas 3" ${k.nama=='Tugas 3'?'selected':''}>Tugas 3</option>
+                        <option value="Praktek" ${k.nama=='Praktek'?'selected':''}>Praktek</option>
+                        <option value="Nilai Akhir" ${k.nama=='Nilai Akhir'?'selected':''}>Nilai Akhir</option>
+                    </select>
+                    <div class="flex items-center bg-white border border-gray-300 rounded-lg px-2 overflow-hidden shadow-inner">
+                        <input type="number" id="r_bobot_${i}" value="${k.bobot}" oninput="updateTempRumus()" placeholder="0" class="w-10 py-2 text-sm font-black text-center text-indigo-600 focus:outline-none">
+                        <span class="text-xs text-gray-400 font-bold">%</span>
+                    </div>
+                    <button onclick="hapusRumus(${i})" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"><i class="fas fa-times"></i></button>
+                </div>`;
+            });
+            document.getElementById('listRumus').innerHTML = html;
+            
+            const tr = document.getElementById('totRumus');
+            tr.innerText = tot;
+            if(tot !== 100) { tr.className = "text-red-500 text-lg font-bold"; } 
+            else { tr.className = "text-emerald-500 text-lg font-bold"; }
+        };
+
+        // PERBAIKAN: Fungsi ini tidak me-render ulang list agar keyboard tidak turun
+        window.updateTempRumus = function() {
+            let tot = 0;
+            tempKomponen.forEach((k, i) => {
+                if(document.getElementById(`r_nama_${i}`)) {
+                    k.nama = document.getElementById(`r_nama_${i}`).value;
+                    k.bobot = parseFloat(document.getElementById(`r_bobot_${i}`).value) || 0;
+                    tot += k.bobot;
+                }
+            });
+            
+            const tr = document.getElementById('totRumus');
+            tr.innerText = tot;
+            if(tot !== 100) { tr.className = "text-red-500 text-lg font-bold"; } 
+            else { tr.className = "text-emerald-500 text-lg font-bold"; }
+        };
+
+        window.tambahRumus = function() {
+            tempKomponen.push({ id: 'k'+Date.now(), nama: 'Ujian Harian', bobot: 0 });
+            renderListRumus();
+        };
+
+        window.hapusRumus = function(idx) {
+            tempKomponen.splice(idx, 1);
+            renderListRumus();
+        };
+
+        window.simpanRumus = function() {
+            let tot = 0; tempKomponen.forEach(k => tot += k.bobot);
+            if(tot !== 100) return alert('Total persentase bobot harus tepat 100% (saat ini '+tot+'%). Tidak bisa disimpan!');
+            if(tempKomponen.length === 0) return alert('Minimal harus ada 1 komponen nilai!');
+            
+            activeKomponen = JSON.parse(JSON.stringify(tempKomponen));
+            
+            set(ref(db, `TahunAjaran/${activeSemesterGuru}/PengaturanKomponen/${activeTugas.idKelas}/${activeTugas.idMapel}`), activeKomponen);
+            
+            document.getElementById('panelRumus').classList.add('hidden');
+            document.getElementById('iconRumus').classList.remove('rotate-180');
+            renderSiswaInputUI(); 
+        };
+
+        // --- RENDER FORM INPUT NILAI ---
         window.bukaInputNilai = function(idKelas, idMapel) {
             activeTugas = { idKelas, idMapel };
             document.body.style.background = '#f9fafb'; 
@@ -309,97 +391,170 @@
             document.getElementById('inputTitleMapel').innerText = dataMapelAll[idMapel].nama;
             document.getElementById('inputTitleKelas').innerText = dataKelasAll[idKelas].nama;
 
+            document.getElementById('listSiswaInput').innerHTML = '<div class="text-center p-12"><span class="spinner !border-indigo-600 !border-t-indigo-200"></span><p class="text-indigo-600 mt-4 font-bold text-sm">Menyiapkan form penilaian...</p></div>';
+            switchView(viewInput);
+
+            get(ref(db, `TahunAjaran/${activeSemesterGuru}/PengaturanKomponen/${idKelas}/${idMapel}`)).then(snap => {
+                if(snap.exists()) activeKomponen = snap.val();
+                else activeKomponen = [{ id: 'k1', nama: 'Nilai Akhir', bobot: 100 }];
+                renderSiswaInputUI();
+            }).catch(err => {
+                activeKomponen = [{ id: 'k1', nama: 'Nilai Akhir', bobot: 100 }];
+                renderSiswaInputUI();
+            });
+        };
+
+        window.renderSiswaInputUI = function() {
+            const { idKelas, idMapel } = activeTugas;
             const siswaObj = dataKelasAll[idKelas].siswa || {};
             const container = document.getElementById('listSiswaInput');
             
             let siswaTerfilter = [];
             Object.entries(siswaObj).forEach(([idSiswa, s]) => {
-                // Tampilkan santri aktif ATAU santri yang sudah punya riwayat nilai di semester aktif ini
                 let adaRiwayatDiSemesterIni = dataNilaiAll[idKelas]?.[idMapel]?.[idSiswa] !== undefined;
-                if (s.status !== 'nonaktif' || adaRiwayatDiSemesterIni) {
-                    siswaTerfilter.push({idSiswa, ...s});
-                }
+                if (s.status !== 'nonaktif' || adaRiwayatDiSemesterIni) siswaTerfilter.push({idSiswa, ...s});
             });
 
             if(siswaTerfilter.length === 0) {
                 container.innerHTML = '<div class="text-center p-10 bg-white rounded-3xl shadow-sm border border-gray-100 text-gray-500"><i class="fas fa-folder-open text-4xl mb-4 opacity-30"></i><p>Belum ada siswa aktif di kelas ini.</p></div>';
-            } else {
-                let html = '';
-                let num = 1;
-                siswaTerfilter.forEach((s) => {
-                    const idSiswa = s.idSiswa;
-                    const nilaiExist = dataNilaiAll[idKelas]?.[idMapel]?.[idSiswa]?.nilaiAngka ?? "";
-                    const badge = window.getBadgeInfo(nilaiExist);
-                    
-                    let statusLabel = s.status === 'nonaktif' ? `<span class="bg-red-100 text-red-600 text-[10px] px-1.5 py-0.5 rounded ml-2">Arsip</span>` : '';
+                return;
+            }
 
-                    html += `
-                    <div class="bg-white p-5 rounded-3xl shadow-[0_4px_15px_rgba(0,0,0,0.03)] border border-gray-100 flex items-center justify-between transition-all hover:shadow-[0_8px_25px_rgba(0,0,0,0.06)] group">
-                        <div class="flex-1 pr-4">
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-md">No. ${num++}</span>
-                            </div>
-                            <p class="font-extrabold text-base text-gray-800 leading-tight">${s.nama} ${statusLabel}</p>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <div class="text-center w-[75px]">
-                                <span id="badge_${idSiswa}" class="text-[11px] font-extrabold px-2 py-1 rounded-lg block border ${badge.class} shadow-sm transition-colors duration-300">${badge.text}</span>
-                            </div>
-                            <input type="number" id="input_${idSiswa}" data-idsiswa="${idSiswa}" value="${nilaiExist}" oninput="updateBadge('${idSiswa}')" placeholder="0" class="w-16 h-14 bg-gray-50 border-2 border-gray-200 text-center text-xl font-black text-indigo-900 rounded-2xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 focus:bg-white transition-all shadow-inner">
-                        </div>
+            let html = ''; let num = 1;
+            let gridCols = activeKomponen.length >= 3 ? 'grid-cols-3' : (activeKomponen.length === 2 ? 'grid-cols-2' : 'grid-cols-1');
+
+            siswaTerfilter.forEach((s) => {
+                const idSiswa = s.idSiswa;
+                const dbData = dataNilaiAll[idKelas]?.[idMapel]?.[idSiswa] || {};
+                const nilaiExist = dbData.nilaiAngka ?? "";
+                const detailExist = dbData.detail || {};
+                
+                let statusLabel = s.status === 'nonaktif' ? `<span class="bg-red-100 text-red-600 text-[9px] px-1.5 py-0.5 rounded ml-2 font-bold uppercase tracking-wider">Arsip</span>` : '';
+
+                let inputGrid = '';
+                activeKomponen.forEach(k => {
+                    let v = detailExist[k.id] !== undefined ? detailExist[k.id] : '';
+                    if(v === '' && activeKomponen.length === 1 && nilaiExist !== '') v = nilaiExist;
+
+                    inputGrid += `
+                    <div class="bg-gray-50 rounded-2xl p-2.5 border border-gray-100 relative shadow-inner">
+                        <label class="block text-[10px] font-extrabold text-indigo-400 uppercase tracking-widest mb-1.5 truncate text-center">${k.nama}</label>
+                        <input type="number" id="input_${idSiswa}_${k.id}" value="${v}" oninput="hitungTotalLive('${idSiswa}')" placeholder="0" class="w-full bg-white border border-gray-200 text-center text-xl font-black text-indigo-900 rounded-xl py-2 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all shadow-sm komp-input-${idSiswa}">
+                        <div class="absolute top-1 right-2 text-[9px] font-bold text-gray-300">${k.bobot}%</div>
                     </div>`;
                 });
-                container.innerHTML = html;
-            }
-            switchView(viewInput);
+
+                // PERBAIKAN: Menambahkan elemen angka besar untuk "Nilai Rapot" (angka_final_X)
+                html += `
+                <div class="bg-white p-5 rounded-3xl shadow-[0_4px_15px_rgba(0,0,0,0.03)] border border-gray-100 transition-all hover:shadow-[0_8px_25px_rgba(0,0,0,0.06)] group row-nilai mb-4" data-idsiswa="${idSiswa}">
+                    <div class="flex items-center justify-between mb-4 border-b border-gray-50 pb-3">
+                        <div class="flex-1 pr-2">
+                            <div class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1"><i class="fas fa-user-graduate mr-1"></i> Santri No. ${num++}</div>
+                            <h4 class="font-extrabold text-gray-800 text-lg leading-tight tracking-tight">${s.nama} ${statusLabel}</h4>
+                        </div>
+                        
+                        <div class="text-center w-[85px] shrink-0 bg-indigo-50/50 p-2 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center">
+                            <div class="text-[9px] font-bold text-indigo-500 mb-1 uppercase tracking-widest">NILAI RAPOT</div>
+                            <div id="angka_final_${idSiswa}" class="text-3xl font-black text-indigo-900 leading-none mb-1.5">${nilaiExist || '-'}</div>
+                            <span id="badge_${idSiswa}" class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-lg block border shadow-sm transition-colors duration-300">-</span>
+                            <input type="hidden" id="final_${idSiswa}" value="${nilaiExist}">
+                        </div>
+
+                    </div>
+                    <div class="grid ${gridCols} gap-2">
+                        ${inputGrid}
+                    </div>
+                </div>`;
+            });
+            container.innerHTML = html;
+
+            siswaTerfilter.forEach(s => window.hitungTotalLive(s.idSiswa));
         };
 
-        window.updateBadge = function(idSiswa) {
-            const input = document.getElementById(`input_${idSiswa}`);
+        // PERBAIKAN: Menyalurkan angka hasil hitungan ke elemen angka besar (angka_final_X)
+        window.hitungTotalLive = function(idSiswa) {
+            let total = 0;
+            let semuaKosong = true;
+            
+            activeKomponen.forEach(k => {
+                const input = document.getElementById(`input_${idSiswa}_${k.id}`);
+                if(input && input.value !== "") {
+                    semuaKosong = false;
+                    let val = parseFloat(input.value);
+                    if(val < 0) val = 0; if(val > 100) val = 100;
+                    if(input.value != val) input.value = val;
+                    total += val * (k.bobot / 100);
+                }
+            });
+
+            const finalInput = document.getElementById(`final_${idSiswa}`);
             const badgeSpan = document.getElementById(`badge_${idSiswa}`);
-            let val = input.value;
-            if(val !== "" && (val < 0 || val > 100)) { input.value = val > 100 ? 100 : 0; val = input.value; }
-            const badgeInfo = window.getBadgeInfo(val);
-            badgeSpan.className = `text-[11px] font-extrabold px-2 py-1 rounded-lg block border shadow-sm transition-colors duration-300 ${badgeInfo.class}`;
-            badgeSpan.innerText = badgeInfo.text;
+            const angkaFinalDiv = document.getElementById(`angka_final_${idSiswa}`);
+
+            if(semuaKosong) {
+                finalInput.value = "";
+                angkaFinalDiv.innerText = "-";
+                const badgeInfo = window.getBadgeInfo("");
+                badgeSpan.className = `text-[10px] font-extrabold px-1.5 py-0.5 rounded-lg block border shadow-sm transition-colors duration-300 ${badgeInfo.class}`;
+                badgeSpan.innerText = badgeInfo.text;
+            } else {
+                let finalScore = Math.round(total);
+                finalInput.value = finalScore;
+                angkaFinalDiv.innerText = finalScore;
+                const badgeInfo = window.getBadgeInfo(finalScore);
+                badgeSpan.className = `text-[10px] font-extrabold px-1.5 py-0.5 rounded-lg block border shadow-sm transition-colors duration-300 ${badgeInfo.class}`;
+                badgeSpan.innerText = badgeInfo.text;
+            }
         };
 
         window.kembaliKeDashboard = function() {
             activeTugas = null;
             document.body.style.background = 'linear-gradient(135deg, #111827 0%, #312e81 100%)';
+            document.getElementById('panelRumus').classList.add('hidden');
+            document.getElementById('iconRumus').classList.remove('rotate-180');
             switchView(viewDashboard);
         };
 
         window.simpanKeServer = function() {
             const btn = document.getElementById('btnSimpanNilai');
             const originalContent = btn.innerHTML;
-            btn.innerHTML = '<span class="spinner"></span> <span class="ml-3 tracking-wide">Menyinkronkan...</span>';
+            btn.innerHTML = '<span class="spinner"></span> <span class="ml-3 tracking-wide">Menyinkronkan Data...</span>';
             btn.disabled = true;
 
             const { idKelas, idMapel } = activeTugas;
             const namaGuru = dataGuruAll[loggedInGuruId].nama;
             const timestamp = new Date().toISOString();
 
-            const inputs = document.querySelectorAll('#listSiswaInput input[type="number"]');
             let promises = [];
+            const rows = document.querySelectorAll('.row-nilai');
 
-            inputs.forEach(input => {
-                const idSiswa = input.getAttribute('data-idsiswa');
-                const nilai = input.value;
-                // MENGGUNAKAN ACTIVE SEMESTER YANG DIPILIH SAAT LOGIN
+            rows.forEach(row => {
+                const idSiswa = row.dataset.idsiswa;
+                const finalVal = document.getElementById(`final_${idSiswa}`).value;
                 const dbRef = ref(db, `TahunAjaran/${activeSemesterGuru}/Nilai/${idKelas}/${idMapel}/${idSiswa}`);
                 
-                if(nilai !== "") {
-                    let p = set(dbRef, { nilaiAngka: parseFloat(nilai), diinputOleh: namaGuru, timestamp: timestamp });
+                if(finalVal !== "") {
+                    let detailObj = {};
+                    activeKomponen.forEach(k => {
+                        const inp = document.getElementById(`input_${idSiswa}_${k.id}`);
+                        detailObj[k.id] = inp ? parseFloat(inp.value) || 0 : 0;
+                    });
+
+                    let p = set(dbRef, { 
+                        nilaiAngka: parseFloat(finalVal), 
+                        detail: detailObj,
+                        diinputOleh: namaGuru, 
+                        timestamp: timestamp 
+                    });
                     promises.push(p);
                 } else {
-                    promises.push(set(dbRef, null));
+                    promises.push(set(dbRef, null)); 
                 }
             });
 
             Promise.all(promises).then(() => {
                 setTimeout(() => {
-                    btn.innerHTML = '<i class="fas fa-check-circle mr-3 text-2xl"></i> Tersimpan!';
+                    btn.innerHTML = '<i class="fas fa-check-circle mr-3 text-2xl"></i> Semua Tersimpan!';
                     btn.classList.replace('bg-indigo-600', 'bg-green-500');
                     btn.classList.replace('hover:bg-indigo-700', 'hover:bg-green-600');
                     btn.classList.replace('shadow-[0_8px_20px_rgba(79,70,229,0.4)]', 'shadow-[0_8px_20px_rgba(34,197,94,0.4)]');
